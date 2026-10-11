@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { getUnreadCount } from '../services/notificationService';
 import ThemeToggle from './ThemeToggle';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -70,15 +72,6 @@ export default function Sidebar() {
       ),
     },
     {
-      name: 'Chat',
-      path: '/skill-swapper?tab=connections',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-      ),
-    },
-    {
       name: 'Notifications',
       path: '/notifications',
       icon: (
@@ -95,10 +88,13 @@ export default function Sidebar() {
       const [pathname, search] = itemPath.split('?');
       return location.pathname === pathname && location.search.includes(search);
     }
-    if (itemPath === '/skill-swapper') {
-      return location.pathname === '/skill-swapper' && !location.search.includes('tab=connections');
-    }
     return location.pathname === itemPath || (itemPath !== '/' && location.pathname.startsWith(`${itemPath}/`));
+  };
+
+  const handleLogout = () => {
+    setMobileOpen(false);
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -216,11 +212,16 @@ export default function Sidebar() {
                   to={item.path}
                   onClick={() => setMobileOpen(false)}
                   className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                  id={`sidebar-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  id={item.name === 'Profile' ? 'my-profile-btn' : `sidebar-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <span className="sidebar-nav-icon">{item.icon}</span>
-                  <span className="sidebar-nav-text">{item.name}</span>
+                  <span
+                    className="sidebar-nav-text"
+                    id={item.name === 'Profile' ? 'sidebar-link-my-profile' : undefined}
+                  >
+                    {item.name}
+                  </span>
                   {item.name === 'Notifications' && unreadCount > 0 && (
                     <span className="sidebar-notif-count-pill" id="sidebar-unread-badge">
                       {unreadCount}
@@ -232,6 +233,31 @@ export default function Sidebar() {
             );
           })}
         </nav>
+
+        {/* Sidebar Footer with Theme Toggle & Logout */}
+        <div className="sidebar-footer">
+          <div className="sidebar-theme-row">
+            <span className="theme-row-label">Theme</span>
+            <ThemeToggle id="desktop-theme-toggle" />
+          </div>
+
+          <button
+            type="button"
+            className="sidebar-logout-btn btn-nav-logout"
+            id="sidebar-logout-btn"
+            onClick={handleLogout}
+            title="Log out of SkillSync"
+          >
+            <span className="sidebar-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </span>
+            <span className="sidebar-nav-text" id="logout-btn">Logout</span>
+          </button>
+        </div>
       </aside>
     </>
   );

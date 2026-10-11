@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getProfile } from '../../services/profileService';
 import ThemeToggle from '../ThemeToggle';
 
+
 export default function DashboardHeader({ profile: propProfile }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();

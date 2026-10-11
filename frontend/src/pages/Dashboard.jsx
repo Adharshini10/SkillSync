@@ -156,7 +156,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="dashboard-page-container" id="dashboard-main-view">
+    <div className="dashboard-page-container dashboard-container" id="dashboard-main-view">
       {/* ── Top Header Bar ────────────────────────────────────────── */}
       <DashboardHeader profile={profile} />
 

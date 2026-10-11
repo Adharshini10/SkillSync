@@ -1,11 +1,16 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 
 function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (!isAuthenticated && (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/')) {
+    return null;
+  }
 
   const handleLogout = () => {
     logout();

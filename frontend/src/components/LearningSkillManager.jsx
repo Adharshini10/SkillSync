@@ -25,7 +25,7 @@ export default function LearningSkillManager({
   const [validationError, setValidationError] = useState('');
 
   const handleAddSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const trimmed = inputValue.trim();
     if (!trimmed) {
       setValidationError('Please enter a skill name.');
@@ -34,7 +34,7 @@ export default function LearningSkillManager({
 
     // Check client-side duplicate
     const exists = learningSkills.some(
-      (s) => s.name.toLowerCase() === trimmed.toLowerCase()
+      (s) => (typeof s === 'string' ? s : s?.name || '').toLowerCase() === trimmed.toLowerCase()
     );
     if (exists) {
       setValidationError(`"${trimmed}" is already in your learning list.`);
@@ -144,7 +144,8 @@ export default function LearningSkillManager({
           </div>
           <button
             type="submit"
-            disabled={adding || !inputValue.trim()}
+            onClick={handleAddSubmit}
+            disabled={adding}
             className="btn-add-skill"
             id="add-learning-skill-btn"
           >
