@@ -1,0 +1,34 @@
+# Git ignore rules for SkillSync Spring Boot backend
+
+# ── Maven build output ────────────────────────────────────────
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── IDE files ────────────────────────────────────────────────
+.idea/
+*.iws
+*.iml
+*.ipr
+.classpath
+.project
+.settings/
+*.launch
+.vscode/
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Spring Boot ───────────────────────────────────────────────
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+spring-shell.log
+
+# ── Sensitive config (override in application-local.properties) ──
+# application-secret.properties

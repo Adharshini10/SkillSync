@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillSync - Real-Time Chat Test Suite (Private & Project Group Chat)</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --secondary: #06b6d4;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --bubble-self: #4f46e5;
+            --bubble-other: #334155;
+            --bubble-group: #0369a1;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
+        .container { max-width: 1050px; margin: 0 auto; display: grid; gap: 16px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+        h1 { font-size: 22px; color: #818cf8; margin-bottom: 4px; }
+        p.subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 14px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .tab-btn { background: transparent; color: var(--text-muted); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .tab-btn.active { background: var(--primary); color: white; }
+        .input-group { margin-bottom: 10px; }
+        label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        input {
+            width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
+        }
+        input:focus { border-color: var(--primary); }
+        button {
+            background: var(--primary); color: white; border: none; padding: 8px 14px;
+            border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px;
+        }
+        button:hover { background: var(--primary-hover); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-teal { background: #059669; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-disconnected { background: #374151; color: #9ca3af; }
+        .status-connected { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
+        .chat-box {
+            height: 320px; overflow-y: auto; background: #0b1120; border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .msg-bubble { max-width: 72%; padding: 8px 12px; border-radius: 10px; font-size: 13px; word-break: break-word; }
+        .msg-self { align-self: flex-end; background: var(--bubble-self); color: white; border-bottom-right-radius: 2px; }
+        .msg-other { align-self: flex-start; background: var(--bubble-other); color: white; border-bottom-left-radius: 2px; }
+        .msg-group { align-self: flex-start; background: var(--bubble-group); color: white; border-bottom-left-radius: 2px; }
+        .msg-meta { font-size: 10px; opacity: 0.8; margin-top: 4px; display: flex; justify-content: space-between; gap: 10px; }
+        .log-box {
+            background: #000; border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+            font-family: monospace; font-size: 11px; height: 110px; overflow-y: auto; color: #a5f3fc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. Authentication & WebSocket Header -->
+        <div class="card">
+            <h1>SkillSync Real-Time Chat Suite</h1>
+            <p class="subtitle">Private 1-to-1 Chat (Step 7) & Project Group Chat (Step 8) with Spring STOMP</p>
+
+            <div class="grid-2">
+                <div>
+                    <div style="display: flex; gap: 8px;">
+                        <div class="input-group" style="flex: 2;">
+                            <label>Email</label>
+                            <input id="email" type="email" value="alice_chat@test.com" />
+                        </div>
+                        <div class="input-group" style="flex: 1;">
+                            <label>Password</label>
+                            <input id="password" type="password" value="Password123!" />
+                        </div>
+                    </div>
+                    <button onclick="login()">1. Login & Acquire JWT</button>
+                </div>
+                <div>
+                    <div class="input-group">
+                        <label>Logged-in Student Principal</label>
+                        <div id="currentUserInfo" style="padding: 6px 10px; background: #0f172a; border-radius: 6px; font-size: 12px; color: #38bdf8;">
+                            Not logged in
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span id="wsStatus" class="status-badge status-disconnected">DISCONNECTED</span>
+                        <button id="connectBtn" onclick="connectWebSocket()" disabled>2. Connect WebSocket</button>
+                        <button class="btn-danger" onclick="disconnectWebSocket()">Disconnect</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Chat Mode Switcher Tabs -->
+        <div class="card">
+            <div class="tabs">
+                <button id="tabPrivate" class="tab-btn active" onclick="switchTab('private')">💬 Private 1-to-1 Chat (Step 7)</button>
+                <button id="tabGroup" class="tab-btn" onclick="switchTab('group')">👥 Project Group Chat (Step 8)</button>
+            </div>
+
+            <!-- PRIVATE CHAT VIEW -->
+            <div id="viewPrivate">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <label style="margin: 0;">Connected User ID:</label>
+                        <input id="targetUserId" type="number" placeholder="User ID" style="width: 100px;" value="35" />
+                        <button onclick="loadPrivateHistory()">Load History</button>
+                        <button onclick="markAsRead()">Mark Read</button>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted);">Queue: <code>/user/queue/messages</code></span>
+                </div>
+
+                <div id="privateChatBox" class="chat-box">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
+                        Click "Load History" or send a private message to a connected student.
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <input id="privateMsgInput" type="text" placeholder="Type a private message..." onkeypress="if(event.key==='Enter') sendPrivateWS();" />
+                    <button onclick="sendPrivateWS()" style="width: 120px;">Send (WS)</button>
+                    <button onclick="sendPrivateREST()" style="width: 120px;" class="btn-teal">Send (REST)</button>
+                </div>
+            </div>
+
+            <!-- PROJECT GROUP CHAT VIEW -->
+            <div id="viewGroup" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <label style="margin: 0;">Project ID:</label>
+                        <input id="targetProjectId" type="number" placeholder="Project ID" style="width: 100px;" value="12" />
+                        <button onclick="loadGroupHistory()">Load History</button>
+                        <button onclick="subscribeProjectTopic()" class="btn-teal">Subscribe Group</button>
+                    </div>
+                    <span id="topicStatus" style="font-size: 12px; color: #38bdf8;">Topic: <code>Not subscribed</code></span>
+                </div>
+
+                <div id="groupChatBox" class="chat-box">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
+                        Select an accepted project and click "Subscribe Group" & "Load History".
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <input id="groupMsgInput" type="text" placeholder="Type a project group message..." onkeypress="if(event.key==='Enter') sendGroupWS();" />
+                    <button onclick="sendGroupWS()" style="width: 120px;">Send (WS)</button>
+                    <button onclick="sendGroupREST()" style="width: 120px;" class="btn-teal">Send (REST)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Real-Time STOMP Log -->
+        <div class="card">
+            <h3 style="font-size: 13px; margin-bottom: 6px; color: var(--text-muted);">STOMP Frames & System Logs</h3>
+            <div id="logBox" class="log-box"></div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let jwtToken = null;
+        let currentUserId = null;
+        let currentUserEmail = null;
+        let currentProjectSub = null;
+        let currentSubscribedProjectId = null;
+
+        function log(msg) {
+            const box = document.getElementById("logBox");
+            const time = new Date().toLocaleTimeString();
+            box.innerHTML += `<div>[${time}] ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function switchTab(mode) {
+            if (mode === 'private') {
+                document.getElementById("tabPrivate").className = "tab-btn active";
+                document.getElementById("tabGroup").className = "tab-btn";
+                document.getElementById("viewPrivate").style.display = "block";
+                document.getElementById("viewGroup").style.display = "none";
+            } else {
+                document.getElementById("tabGroup").className = "tab-btn active";
+                document.getElementById("tabPrivate").className = "tab-btn";
+                document.getElementById("viewGroup").style.display = "block";
+                document.getElementById("viewPrivate").style.display = "none";
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            log(`Logging in student: ${email}...`);
+
+            try {
+                const res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                jwtToken = data.token;
+
+                const profRes = await fetch("/api/profile", {
+                    headers: { "Authorization": `Bearer ${jwtToken}` }
+                });
+                const prof = await profRes.json();
+                currentUserId = prof.userId;
+                currentUserEmail = prof.email;
+
+                document.getElementById("currentUserInfo").innerHTML = 
+                    `<strong>${prof.name}</strong> (ID: ${prof.userId}) | ${prof.email}`;
+                document.getElementById("connectBtn").disabled = false;
+                log(`Authentication successful. User ID: ${currentUserId}`);
+            } catch (err) {
+                log("Login error: " + err.message);
+                alert("Login failed: " + err.message);
+            }
+        }
+
+        function connectWebSocket() {
+            if (!jwtToken) return alert("Login first!");
+
+            log("Connecting STOMP WebSocket to /ws...");
+            const socket = new SockJS("/ws");
+            stompClient = Stomp.over(socket);
+            stompClient.debug = function(str) {
+                if (!str.includes("PING") && !str.includes("PONG")) log("STOMP: " + str);
+            };
+
+            stompClient.connect({ "Authorization": `Bearer ${jwtToken}` }, function(frame) {
+                log("STOMP connected as " + (frame.headers['user-name'] || currentUserEmail));
+                const badge = document.getElementById("wsStatus");
+                badge.className = "status-badge status-connected";
+                badge.innerText = "CONNECTED";
+
+                // Auto-subscribe to private one-to-one queue
+                stompClient.subscribe("/user/queue/messages", function(msgOutput) {
+                    const msg = JSON.parse(msgOutput.body);
+                    log(`Received private message from User ${msg.senderId} (${msg.senderName})`);
+                    appendPrivateMessage(msg);
+                });
+                log("Subscribed to /user/queue/messages");
+
+                // If project ID is set, subscribe to project group topic
+                const projId = document.getElementById("targetProjectId").value;
+                if (projId) {
+                    subscribeProjectTopic();
+                }
+            }, function(err) {
+                log("STOMP Error: " + err);
+                const badge = document.getElementById("wsStatus");
+                badge.className = "status-badge status-disconnected";
+                badge.innerText = "DISCONNECTED";
+            });
+        }
+
+        function disconnectWebSocket() {
+            if (stompClient) stompClient.disconnect();
+            const badge = document.getElementById("wsStatus");
+            badge.className = "status-badge status-disconnected";
+            badge.innerText = "DISCONNECTED";
+            log("WebSocket disconnected.");
+        }
+
+        function subscribeProjectTopic() {
+            if (!stompClient || !stompClient.connected) return alert("Connect WebSocket first!");
+            const projId = document.getElementById("targetProjectId").value;
+            if (!projId) return alert("Enter Project ID!");
+
+            if (currentProjectSub) {
+                currentProjectSub.unsubscribe();
+            }
+
+            const topic = `/topic/project/${projId}`;
+            try {
+                currentProjectSub = stompClient.subscribe(topic, function(msgOutput) {
+                    const msg = JSON.parse(msgOutput.body);
+                    log(`Received project message in [${msg.projectTitle}] from ${msg.senderName}`);
+                    appendGroupMessage(msg);
+                });
+                currentSubscribedProjectId = projId;
+                document.getElementById("topicStatus").innerHTML = `Topic: <code>${topic}</code>`;
+                log("Subscribed to project group destination: " + topic);
+            } catch (err) {
+                log("Subscription error: " + err);
+            }
+        }
+
+        // ── Step 7: Private Chat Handlers ─────────────────────
+        function appendPrivateMessage(msg) {
+            const box = document.getElementById("privateChatBox");
+            if (box.children.length === 1 && box.children[0].innerText.includes("Click \"Load History\"")) {
+                box.innerHTML = "";
+            }
+            const isSelf = msg.senderId === currentUserId;
+            const bubble = document.createElement("div");
+            bubble.className = `msg-bubble ${isSelf ? "msg-self" : "msg-other"}`;
+            bubble.innerHTML = `
+                <div>${escapeHtml(msg.content)}</div>
+                <div class="msg-meta">
+                    <span>${isSelf ? "You" : msg.senderName}</span>
+                    <span>${new Date(msg.sentAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • ${msg.readStatus}</span>
+                </div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function sendPrivateWS() {
+            const targetId = document.getElementById("targetUserId").value;
+            const content = document.getElementById("privateMsgInput").value.trim();
+            if (!targetId || !content) return alert("Enter target user and message!");
+            if (!stompClient || !stompClient.connected) return alert("Connect WebSocket first!");
+
+            stompClient.send("/app/chat", {}, JSON.stringify({ receiverId: parseInt(targetId), content }));
+            document.getElementById("privateMsgInput").value = "";
+        }
+
+        async function sendPrivateREST() {
+            const targetId = document.getElementById("targetUserId").value;
+            const content = document.getElementById("privateMsgInput").value.trim();
+            if (!targetId || !content) return alert("Enter target user and message!");
+
+            const res = await fetch("/api/chat/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwtToken}` },
+                body: JSON.stringify({ receiverId: parseInt(targetId), content })
+            });
+            if (res.ok) {
+                const sent = await res.json();
+                appendPrivateMessage(sent);
+                document.getElementById("privateMsgInput").value = "";
+            } else {
+                const err = await res.json();
+                alert(err.message || "Failed to send");
+            }
+        }
+
+        async function loadPrivateHistory() {
+            const targetId = document.getElementById("targetUserId").value;
+            const res = await fetch(`/api/chat/${targetId}`, { headers: { "Authorization": `Bearer ${jwtToken}` } });
+            if (res.ok) {
+                const msgs = await res.json();
+                const box = document.getElementById("privateChatBox");
+                box.innerHTML = "";
+                msgs.forEach(appendPrivateMessage);
+            } else {
+                const err = await res.json();
+                alert(err.message || "Failed to load history");
+            }
+        }
+
+        async function markAsRead() {
+            const targetId = document.getElementById("targetUserId").value;
+            const res = await fetch(`/api/chat/${targetId}/read`, { method: "PUT", headers: { "Authorization": `Bearer ${jwtToken}` } });
+            if (res.ok) {
+                log("Marked as read");
+                loadPrivateHistory();
+            }
+        }
+
+        // ── Step 8: Project Group Chat Handlers ───────────────
+        function appendGroupMessage(msg) {
+            const box = document.getElementById("groupChatBox");
+            if (box.children.length === 1 && box.children[0].innerText.includes("Select an accepted project")) {
+                box.innerHTML = "";
+            }
+            const isSelf = msg.senderId === currentUserId;
+            const bubble = document.createElement("div");
+            bubble.className = `msg-bubble ${isSelf ? "msg-self" : "msg-group"}`;
+            bubble.innerHTML = `
+                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">${isSelf ? "You" : msg.senderName}</div>
+                <div>${escapeHtml(msg.content)}</div>
+                <div class="msg-meta">
+                    <span>${msg.projectTitle || "Project " + msg.projectId}</span>
+                    <span>${new Date(msg.sentAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function sendGroupWS() {
+            const projId = document.getElementById("targetProjectId").value;
+            const content = document.getElementById("groupMsgInput").value.trim();
+            if (!projId || !content) return alert("Enter Project ID and message!");
+            if (!stompClient || !stompClient.connected) return alert("Connect WebSocket first!");
+
+            stompClient.send("/app/project-chat", {}, JSON.stringify({ projectId: parseInt(projId), content }));
+            document.getElementById("groupMsgInput").value = "";
+        }
+
+        async function sendGroupREST() {
+            const projId = document.getElementById("targetProjectId").value;
+            const content = document.getElementById("groupMsgInput").value.trim();
+            if (!projId || !content) return alert("Enter Project ID and message!");
+
+            const res = await fetch(`/api/projects/${projId}/chat/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwtToken}` },
+                body: JSON.stringify({ projectId: parseInt(projId), content })
+            });
+            if (res.ok) {
+                const sent = await res.json();
+                appendGroupMessage(sent);
+                document.getElementById("groupMsgInput").value = "";
+            } else {
+                const err = await res.json();
+                alert(err.message || "Failed to send");
+            }
+        }
+
+        async function loadGroupHistory() {
+            const projId = document.getElementById("targetProjectId").value;
+            const res = await fetch(`/api/projects/${projId}/chat`, { headers: { "Authorization": `Bearer ${jwtToken}` } });
+            if (res.ok) {
+                const msgs = await res.json();
+                const box = document.getElementById("groupChatBox");
+                box.innerHTML = "";
+                if (msgs.length === 0) {
+                    box.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">No group messages in this project yet. Start chatting!</div>';
+                } else {
+                    msgs.forEach(appendGroupMessage);
+                }
+                log(`Loaded ${msgs.length} group message(s) for Project ${projId}`);
+            } else {
+                const err = await res.json();
+                alert(err.message || "Failed to load project chat history");
+            }
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

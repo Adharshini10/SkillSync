@@ -1,0 +1,17 @@
+import api from './api';
+
+/**
+ * Authentication API Service.
+ * Interacts with Spring Boot endpoints:
+ *   - POST /api/auth/register
+ *   - POST /api/auth/login
+ */
+export const registerUser = async (userData) => {
+  const response = await api.post('/auth/register', userData);
+  return response.data;
+};
+
+export const loginUser = async (credentials) => {
+  const response = await api.post('/auth/login', credentials);
+  return response.data;
+};
